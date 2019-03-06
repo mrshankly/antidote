@@ -1,6 +1,12 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2014 SyncFree Consortium.  All Rights Reserved.
+%% Copyright <2013-2018> <
+%%  Technische Universität Kaiserslautern, Germany
+%%  Université Pierre et Marie Curie / Sorbonne-Université, France
+%%  Universidade NOVA de Lisboa, Portugal
+%%  Université catholique de Louvain (UCL), Belgique
+%%  INESC TEC, Portugal
+%% >
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -12,11 +18,14 @@
 %% Unless required by applicable law or agreed to in writing,
 %% software distributed under the License is distributed on an
 %% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-%% KIND, either express or implied.  See the License for the
+%% KIND, either expressed or implied.  See the License for the
 %% specific language governing permissions and limitations
 %% under the License.
 %%
+%% List of the contributors to the development of Antidote: see AUTHORS file.
+%% Description and complete License: see LICENSE file.
 %% -------------------------------------------------------------------
+
 -module(vectorclock_vnode).
 
 -behaviour(riak_core_vnode).
@@ -95,7 +104,7 @@ handle_command(calculate_stable_snapshot, _Sender, State) ->
   Metadata = metadata_maybe_list(?META_PREFIX),
   %% If metadata does not contain clock of all partitions, do not calculate the stable snapshot
   case dc_utilities:get_partitions_num() == length(Metadata) of
-    false -> lager:warning("Metadata misses entries for some partitions, skipping the calculate_stable_snapshot.");
+    false -> logger:warning("Metadata misses entries for some partitions, skipping the calculate_stable_snapshot.");
     true ->
       VClocks = lists:foldl(fun({_Key, Value}, AccList) ->
         case is_list(Value) of
@@ -116,13 +125,13 @@ handle_command({update_clock, NewClock}, _Sender, State = #state{vectorclock = C
 
 metadata_maybe_put(Prefix, Key, Value) ->
   case catch riak_core_metadata:put(Prefix, Key, Value) of
-    {'EXIT', {shutdown, _}} -> lager:warning("Failed to update partition clock: shutting down.");
+    {'EXIT', {shutdown, _}} -> logger:warning("Failed to update partition clock: shutting down.");
     Normal -> Normal
   end.
 
 metadata_maybe_list(Prefix) ->
   case catch riak_core_metadata:to_list(Prefix) of
-    {'EXIT', Reason} -> lager:warning("Failed to fetch metadata (reason: ~p)", [Reason]), [];
+    {'EXIT', Reason} -> logger:warning("Failed to fetch metadata (reason: ~p)", [Reason]), [];
     Normal -> Normal
   end.
 

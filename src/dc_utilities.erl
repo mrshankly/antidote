@@ -1,6 +1,12 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2014 SyncFree Consortium.  All Rights Reserved.
+%% Copyright <2013-2018> <
+%%  Technische Universität Kaiserslautern, Germany
+%%  Université Pierre et Marie Curie / Sorbonne-Université, France
+%%  Universidade NOVA de Lisboa, Portugal
+%%  Université catholique de Louvain (UCL), Belgique
+%%  INESC TEC, Portugal
+%% >
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -12,11 +18,14 @@
 %% Unless required by applicable law or agreed to in writing,
 %% software distributed under the License is distributed on an
 %% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-%% KIND, either express or implied.  See the License for the
+%% KIND, either expressed or implied.  See the License for the
 %% specific language governing permissions and limitations
 %% under the License.
 %%
+%% List of the contributors to the development of Antidote: see AUTHORS file.
+%% Description and complete License: see LICENSE file.
 %% -------------------------------------------------------------------
+
 -module(dc_utilities).
 -include("antidote.hrl").
 
@@ -87,7 +96,7 @@ get_all_partitions() ->
         [I || {I, _} <- Nodes]
     catch
         _Ex:Res ->
-            lager:debug("Error loading partition names: ~p, will retry", [Res]),
+            logger:debug("Error loading partition names: ~p, will retry", [Res]),
             get_all_partitions()
     end.
 
@@ -101,7 +110,7 @@ get_all_partitions_nodes() ->
         chash:nodes(CHash)
     catch
         _Ex:Res ->
-            lager:debug("Error loading partition-node names ~p, will retry", [Res]),
+            logger:debug("Error loading partition-node names ~p, will retry", [Res]),
             get_all_partitions_nodes()
     end.
 
@@ -164,7 +173,7 @@ ensure_all_vnodes_running(VnodeType) ->
     case Partitions == Running of
         true -> ok;
         false ->
-            lager:debug("Waiting for vnode ~p: required ~p, spawned ~p", [VnodeType, Partitions, Running]),
+            logger:debug("Waiting for vnode ~p: required ~p, spawned ~p", [VnodeType, Partitions, Running]),
             timer:sleep(250),
             ensure_all_vnodes_running(VnodeType)
     end.
@@ -187,7 +196,7 @@ bcast_vnode_check_up(VMaster, Request, [P|Rest]) ->
           end,
     case Err of
         true ->
-            lager:debug("Vnode not up retrying, ~p, ~p", [VMaster, P]),
+            logger:debug("Vnode not up retrying, ~p, ~p", [VMaster, P]),
             timer:sleep(1000),
             bcast_vnode_check_up(VMaster, Request, [P|Rest]);
         false ->
@@ -224,7 +233,7 @@ check_staleness() ->
 check_registered(Name) ->
     case whereis(Name) of
         undefined ->
-            lager:debug("Wait for ~p to register", [Name]),
+            logger:debug("Wait for ~p to register", [Name]),
             timer:sleep(100),
             check_registered(Name);
         _ ->

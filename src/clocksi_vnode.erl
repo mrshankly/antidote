@@ -1,6 +1,12 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2014 SyncFree Consortium.  All Rights Reserved.
+%% Copyright <2013-2018> <
+%%  Technische Universität Kaiserslautern, Germany
+%%  Université Pierre et Marie Curie / Sorbonne-Université, France
+%%  Universidade NOVA de Lisboa, Portugal
+%%  Université catholique de Louvain (UCL), Belgique
+%%  INESC TEC, Portugal
+%% >
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -12,11 +18,14 @@
 %% Unless required by applicable law or agreed to in writing,
 %% software distributed under the License is distributed on an
 %% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-%% KIND, either express or implied.  See the License for the
+%% KIND, either expressed or implied.  See the License for the
 %% specific language governing permissions and limitations
 %% under the License.
 %%
+%% List of the contributors to the development of Antidote: see AUTHORS file.
+%% Description and complete License: see LICENSE file.
 %% -------------------------------------------------------------------
+
 -module(clocksi_vnode).
 -behaviour(riak_core_vnode).
 
@@ -248,7 +257,7 @@ open_table(Partition) ->
             [set, protected, named_table, ?TABLE_CONCURRENCY]);
     _ ->
         %% Other vnode hasn't finished closing tables
-        lager:debug("Unable to open ets table in clocksi vnode, retrying"),
+        logger:debug("Unable to open ets table in clocksi vnode, retrying"),
         timer:sleep(100),
         try
         ets:delete(get_cache_name(Partition, prepared))
@@ -424,7 +433,7 @@ terminate(_Reason, #state{partition = Partition} = _State) ->
         ets:delete(get_cache_name(Partition, prepared))
     catch
         _:Reason ->
-            lager:error("Error closing table ~p", [Reason])
+            logger:error("Error closing table ~p", [Reason])
     end,
     clocksi_readitem_server:stop_read_servers(Partition, ?READ_CONCURRENCY),
     ok.
@@ -484,7 +493,7 @@ reset_prepared(_PreparedTx, [], _TxId, _Time, _ActiveTxs) ->
 reset_prepared(PreparedTx, [{Key, _Type, _Update} | Rest], TxId, Time, ActiveTxs) ->
     %% Could do this more efficiently in case of multiple updates to the same key
     true = ets:insert(PreparedTx, {Key, [{TxId, Time} | dict:fetch(Key, ActiveTxs)]}),
-    lager:debug("Inserted preparing txn to PreparedTxns list ~p, [{Key, TxId, Time}]"),
+    logger:debug("Inserted preparing txn to PreparedTxns list ~p, [{Key, TxId, Time}]"),
     reset_prepared(PreparedTx, Rest, TxId, Time, ActiveTxs).
 
 commit(Transaction, TxCommitTime, Updates, CommittedTx, State) ->

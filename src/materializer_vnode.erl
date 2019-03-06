@@ -1,6 +1,12 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2014 SyncFree Consortium.  All Rights Reserved.
+%% Copyright <2013-2018> <
+%%  Technische Universität Kaiserslautern, Germany
+%%  Université Pierre et Marie Curie / Sorbonne-Université, France
+%%  Universidade NOVA de Lisboa, Portugal
+%%  Université catholique de Louvain (UCL), Belgique
+%%  INESC TEC, Portugal
+%% >
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -12,11 +18,14 @@
 %% Unless required by applicable law or agreed to in writing,
 %% software distributed under the License is distributed on an
 %% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-%% KIND, either express or implied.  See the License for the
+%% KIND, either expressed or implied.  See the License for the
 %% specific language governing permissions and limitations
 %% under the License.
 %%
+%% List of the contributors to the development of Antidote: see AUTHORS file.
+%% Description and complete License: see LICENSE file.
 %% -------------------------------------------------------------------
+
 -module(materializer_vnode).
 
 -behaviour(riak_core_vnode).
@@ -113,7 +122,7 @@ init([Partition]) ->
     SnapshotCache = open_table(Partition, snapshot_cache),
     IsReady = case application:get_env(antidote, recover_from_log) of
                 {ok, true} ->
-                    lager:debug("Trying to recover the materializer from log ~p", [Partition]),
+                    logger:debug("Trying to recover the materializer from log ~p", [Partition]),
                     riak_core_vnode:send_command_after(?LOG_STARTUP_WAIT, load_from_log),
                     false;
                 _ ->
@@ -184,17 +193,17 @@ handle_command(load_from_log, _Sender, State=#state{partition=Partition}) ->
     IsReady = try
                 case load_from_log_to_tables(Partition, State) of
                     ok ->
-                        lager:debug("Finished loading from log to materializer on partition ~w", [Partition]),
+                        logger:debug("Finished loading from log to materializer on partition ~w", [Partition]),
                         true;
                     {error, not_ready} ->
                         false;
                     {error, Reason} ->
-                        lager:error("Unable to load logs from disk: ~w, continuing", [Reason]),
+                        logger:error("Unable to load logs from disk: ~w, continuing", [Reason]),
                         true
                 end
             catch
                 _:Reason1 ->
-                    lager:debug("Error loading from log ~w, will retry", [Reason1]),
+                    logger:debug("Error loading from log ~w, will retry", [Reason1]),
                     false
             end,
     ok = case IsReady of
@@ -317,7 +326,7 @@ open_table(Partition, Name) ->
                 [set, protected, named_table, ?TABLE_CONCURRENCY]);
         _ ->
             %% Other vnode hasn't finished closing tables
-            lager:debug("Unable to open ets table in materializer vnode, retrying"),
+            logger:debug("Unable to open ets table in materializer vnode, retrying"),
             timer:sleep(100),
             try
                 ets:delete(get_cache_name(Partition, Name))

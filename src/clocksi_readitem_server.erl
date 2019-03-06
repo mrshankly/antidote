@@ -1,6 +1,12 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2014 SyncFree Consortium.  All Rights Reserved.
+%% Copyright <2013-2018> <
+%%  Technische Universität Kaiserslautern, Germany
+%%  Université Pierre et Marie Curie / Sorbonne-Université, France
+%%  Universidade NOVA de Lisboa, Portugal
+%%  Université catholique de Louvain (UCL), Belgique
+%%  INESC TEC, Portugal
+%% >
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -12,11 +18,14 @@
 %% Unless required by applicable law or agreed to in writing,
 %% software distributed under the License is distributed on an
 %% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-%% KIND, either express or implied.  See the License for the
+%% KIND, either expressed or implied.  See the License for the
 %% specific language governing permissions and limitations
 %% under the License.
 %%
+%% List of the contributors to the development of Antidote: see AUTHORS file.
+%% Description and complete License: see LICENSE file.
 %% -------------------------------------------------------------------
+
 -module(clocksi_readitem_server).
 
 -behavior(gen_server).
@@ -90,7 +99,7 @@ read_data_item({Partition, Node}, Key, Type, Transaction, PropertyList) ->
             {perform_read, Key, Type, Transaction, PropertyList}, infinity)
     catch
     _:Reason ->
-        lager:debug("Exception caught: ~p, starting read server to fix", [Reason]),
+        logger:debug("Exception caught: ~p, starting read server to fix", [Reason]),
         check_server_ready([{Partition, Node}]),
         read_data_item({Partition, Node}, Key, Type, Transaction, PropertyList)
     end.
@@ -155,7 +164,7 @@ start_read_servers_internal(Node, Partition, Num) ->
         {error, {already_started, _}} ->
             start_read_servers_internal(Node, Partition, Num-1);
         Err ->
-            lager:debug("Unable to start clocksi read server for ~w, will retry", [Err]),
+            logger:debug("Unable to start clocksi read server for ~w, will retry", [Err]),
             try
                 gen_server:call({global, generate_server_name(Node, Partition, Num)}, {go_down})
             catch

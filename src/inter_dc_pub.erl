@@ -1,6 +1,12 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2014 SyncFree Consortium.  All Rights Reserved.
+%% Copyright <2013-2018> <
+%%  Technische Universität Kaiserslautern, Germany
+%%  Université Pierre et Marie Curie / Sorbonne-Université, France
+%%  Universidade NOVA de Lisboa, Portugal
+%%  Université catholique de Louvain (UCL), Belgique
+%%  INESC TEC, Portugal
+%% >
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -12,10 +18,12 @@
 %% Unless required by applicable law or agreed to in writing,
 %% software distributed under the License is distributed on an
 %% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-%% KIND, either express or implied.  See the License for the
+%% KIND, either expressed or implied.  See the License for the
 %% specific language governing permissions and limitations
 %% under the License.
 %%
+%% List of the contributors to the development of Antidote: see AUTHORS file.
+%% Description and complete License: see LICENSE file.
 %% -------------------------------------------------------------------
 
 %% InterDC publisher - holds a ZeroMQ PUB socket and makes it available for Antidote processes.
@@ -79,7 +87,7 @@ get_address_list() ->
 -spec broadcast(#interdc_txn{}) -> ok.
 broadcast(Txn) ->
   case catch gen_server:call(?MODULE, {publish, inter_dc_txn:to_bin(Txn)}) of
-    {'EXIT', _Reason} -> lager:warning("Failed to broadcast a transaction."); %% this can happen if a node is shutting down.
+    {'EXIT', _Reason} -> logger:warning("Failed to broadcast a transaction."); %% this can happen if a node is shutting down.
     Normal -> Normal
   end.
 
@@ -90,7 +98,7 @@ start_link() -> gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 init([]) ->
   {_, Port} = get_address(),
   Socket = zmq_utils:create_bind_socket(pub, false, Port),
-  lager:info("Publisher started on port ~p", [Port]),
+  logger:info("Publisher started on port ~p", [Port]),
   {ok, #state{socket = Socket}}.
 
 handle_call({publish, Message}, _From, State) -> {reply, erlzmq:send(State#state.socket, Message), State}.

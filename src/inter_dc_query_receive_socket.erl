@@ -1,6 +1,12 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2014 SyncFree Consortium.  All Rights Reserved.
+%% Copyright <2013-2018> <
+%%  Technische Universität Kaiserslautern, Germany
+%%  Université Pierre et Marie Curie / Sorbonne-Université, France
+%%  Universidade NOVA de Lisboa, Portugal
+%%  Université catholique de Louvain (UCL), Belgique
+%%  INESC TEC, Portugal
+%% >
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -12,10 +18,12 @@
 %% Unless required by applicable law or agreed to in writing,
 %% software distributed under the License is distributed on an
 %% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-%% KIND, either express or implied.  See the License for the
+%% KIND, either expressed or implied.  See the License for the
 %% specific language governing permissions and limitations
 %% under the License.
 %%
+%% List of the contributors to the development of Antidote: see AUTHORS file.
+%% Description and complete License: see LICENSE file.
 %% -------------------------------------------------------------------
 
 %% This is a process running on each node, that is responsible for receiving
@@ -94,7 +102,7 @@ init([]) ->
     {_, Port} = get_address(),
     Socket = zmq_utils:create_bind_socket(xrep, true, Port),
     _Res = rand_compat:seed(erlang:phash2([node()]), erlang:monotonic_time(), erlang:unique_integer()),
-    lager:info("Log reader started on port ~p", [Port]),
+    logger:info("Log reader started on port ~p", [Port]),
     {ok, #state{socket = Socket, next=getid}}.
 
 %% Handle the remote request
@@ -130,7 +138,7 @@ handle_info({zmq, Socket, BinaryMsg, _Flags}, State=#state{id=Id, next=getmsg}) 
     end,
     {noreply, State#state{next=getid}};
 handle_info(Info, State) ->
-    lager:info("got weird info ~p", [Info]),
+    logger:info("got weird info ~p", [Info]),
     {noreply, State}.
 
 handle_call(_Request, _From, State) -> {noreply, State}.

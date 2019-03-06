@@ -1,6 +1,12 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2014 SyncFree Consortium.  All Rights Reserved.
+%% Copyright <2013-2018> <
+%%  Technische Universität Kaiserslautern, Germany
+%%  Université Pierre et Marie Curie / Sorbonne-Université, France
+%%  Universidade NOVA de Lisboa, Portugal
+%%  Université catholique de Louvain (UCL), Belgique
+%%  INESC TEC, Portugal
+%% >
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -12,11 +18,13 @@
 %% Unless required by applicable law or agreed to in writing,
 %% software distributed under the License is distributed on an
 %% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-%% KIND, either express or implied.  See the License for the
+%% KIND, either expressed or implied.  See the License for the
 %% specific language governing permissions and limitations
 %% under the License.
 %%
-%% -----------------------------------------------------------------
+%% List of the contributors to the development of Antidote: see AUTHORS file.
+%% Description and complete License: see LICENSE file.
+%% -------------------------------------------------------------------
 
 
 %% This module exports methods to build a data center of multiple nodes and
@@ -44,7 +52,7 @@
 %% Build a ring of Nodes forming a data center
 -spec create_dc([node()]) -> ok.
 create_dc(Nodes) ->
-    lager:info("Creating DC ring ~p", [Nodes]),
+    logger:info("Creating DC ring ~p", [Nodes]),
     %% Ensure each node owns 100% of it's own ring
     [[Node] = owners_according_to(Node) || Node <- Nodes],
     %% Join nodes
@@ -92,40 +100,40 @@ get_connection_descriptor() ->
 owners_according_to(Node) ->
     case rpc:call(Node, riak_core_ring_manager, get_raw_ring, []) of
         {ok, Ring} ->
-            lager:info("Ring ~p", [Ring]),
+            logger:info("Ring ~p", [Ring]),
             Owners = [Owner || {_Idx, Owner} <- riak_core_ring:all_owners(Ring)],
-            lager:info("Owners ~p", [lists:usort(Owners)]),
+            logger:info("Owners ~p", [lists:usort(Owners)]),
             lists:usort(Owners);
         {badrpc, Reason} ->
-            lager:info("Could not connect to Node ~p", [Node]),
+            logger:info("Could not connect to Node ~p", [Node]),
             {badrpc, Reason}
     end.
 
 %% @doc Have `Node' send a join request to `PNode'
 staged_join(Node, PNode) ->
-    lager:info("[join] ~p to (~p)", [Node, PNode]),
+    logger:info("[join] ~p to (~p)", [Node, PNode]),
     ok = rpc:call(Node, riak_core, staged_join, [PNode]),
     ok.
 
 plan_and_commit(Node) ->
-    lager:info("planning and committing cluster join"),
+    logger:info("planning and committing cluster join"),
     case rpc:call(Node, riak_core_claimant, plan, []) of
         {error, ring_not_ready} ->
-            lager:info("plan: ring not ready"),
+            logger:info("plan: ring not ready"),
             maybe_wait_for_changes(Node),
             plan_and_commit(Node);
         {ok, _, _} ->
             do_commit(Node)
     end.
 do_commit(Node) ->
-    lager:info("Committing"),
+    logger:info("Committing"),
     case rpc:call(Node, riak_core_claimant, commit, []) of
         {error, plan_changed} ->
-            lager:info("commit: plan changed"),
+            logger:info("commit: plan changed"),
             maybe_wait_for_changes(Node),
             plan_and_commit(Node);
         {error, ring_not_ready} ->
-            lager:info("commit: ring not ready"),
+            logger:info("commit: ring not ready"),
             maybe_wait_for_changes(Node),
             do_commit(Node);
         {error, nothing_planned} ->
@@ -136,7 +144,7 @@ do_commit(Node) ->
     end.
 
 try_nodes_ready([Node1 | _Nodes], 0, _SleepMs) ->
-      lager:info("Nodes not ready after initial plan/commit, retrying"),
+      logger:info("Nodes not ready after initial plan/commit, retrying"),
       plan_and_commit(Node1);
   try_nodes_ready(Nodes, N, SleepMs) ->
       ReadyNodes = [Node || Node <- Nodes, is_ready(Node) =:= true],
@@ -155,7 +163,7 @@ maybe_wait_for_changes(Node) ->
 %% on-going or pending ownership transfers.
 -spec wait_until_no_pending_changes([node()]) -> ok | fail.
 wait_until_no_pending_changes(Nodes) ->
-    lager:info("Wait until no pending changes on ~p", [Nodes]),
+    logger:info("Wait until no pending changes on ~p", [Nodes]),
     F = fun() ->
                 rpc:multicall(Nodes, riak_core_vnode_manager, force_handoffs, []),
                 {Rings, BadNodes} = rpc:multicall(Nodes, riak_core_ring_manager, get_raw_ring, []),
@@ -177,7 +185,7 @@ wait_until(Fun) when is_function(Fun) ->
 %% @doc Given a list of nodes, wait until all nodes are considered ready.
 %%      See {@link wait_until_ready/1} for definition of ready.
 wait_until_nodes_ready(Nodes) ->
-    lager:info("Wait until nodes are ready : ~p", [Nodes]),
+    logger:info("Wait until nodes are ready : ~p", [Nodes]),
     [ok = wait_until(Node, fun is_ready/1) || Node <- Nodes],
     ok.
 
@@ -194,7 +202,7 @@ is_ready(Node) ->
     end.
 
 wait_until_nodes_agree_about_ownership(Nodes) ->
-    lager:info("Wait until nodes agree about ownership ~p", [Nodes]),
+    logger:info("Wait until nodes agree about ownership ~p", [Nodes]),
     Results = [ wait_until_owners_according_to(Node, Nodes) || Node <- Nodes ],
     lists:all(fun(X) -> ok =:= X end, Results).
 
@@ -238,6 +246,6 @@ is_ring_ready(Node) ->
 %% @doc Given a list of nodes, wait until all nodes believe the ring has
 %%      converged (ie. `riak_core_ring:is_ready' returns `true').
 wait_until_ring_converged(Nodes) ->
-    lager:info("Wait until ring converged on ~p", [Nodes]),
+    logger:info("Wait until ring converged on ~p", [Nodes]),
     [ok = wait_until(Node, fun is_ring_ready/1)|| Node <- Nodes],
     ok.
