@@ -43,6 +43,7 @@
 
 %% tests
 -export([
+         recreate_dc/1,
          dummy_test/1,
          random_test/1,
          meta_data_env_test/1
@@ -68,10 +69,22 @@ end_per_testcase(Name, _) ->
 
 all() ->
     [
+     recreate_dc,
      dummy_test,
      random_test,
      meta_data_env_test
     ].
+
+
+%% Tests that create_dc is idempotent
+%% calling it again on each node of a dc should have no effect
+recreate_dc(Config) ->
+    [Node1, Node2 | _Nodes] = proplists:get_value(nodes, Config),
+
+    ok = rpc:call(Node1, antidote_dc_manager, create_dc, [[Node1, Node2]]),
+    ok = rpc:call(Node2, antidote_dc_manager, create_dc, [[Node1, Node2]]),
+
+    ok.
 
 
 dummy_test(Config) ->
