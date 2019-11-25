@@ -58,6 +58,7 @@
   now_microsec/0,
   now_millisec/0]).
 
+
 %% Returns the ID of the current DC.
 %% This should not be called manually (it is only used the very
 %% first time the DC is started), instead if you need to know
@@ -269,7 +270,7 @@ get_stable_snapshot() ->
                         0 ->
                             {ok, StableSnapshot};
                         _ ->
-                            DCs = dc_meta_data_utilities:get_dc_ids(true),
+                            DCs = dc_meta_data_utilities:get_ring_members(true),
                             GST = vectorclock:min_clock(StableSnapshot, DCs),
                             {ok, vectorclock:set_all(GST, StableSnapshot)}
                     end
@@ -301,7 +302,7 @@ get_scalar_stable_time() ->
             Now = dc_utilities:now_microsec() - ?OLD_SS_MICROSEC,
             {ok, Now, StableSnapshot};
         _ ->
-            DCs = dc_meta_data_utilities:get_dc_ids(true),
+            DCs = dc_meta_data_utilities:get_ring_members(true),
             GST = vectorclock:min_clock(StableSnapshot, DCs),
             {ok, GST, vectorclock:set_all(GST, StableSnapshot)}
     end.
