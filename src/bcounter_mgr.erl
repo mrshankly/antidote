@@ -77,13 +77,13 @@ init([]) ->
 %% If the operation is unsafe (i.e. the value of the counter can go
 %% below 0), operation fails, otherwhise a downstream for the decrement
 %% is generated.
-generate_downstream(Key, {decrement, {V, _}}, BCounter) ->
+generate_downstream(Key, {decrement, V}, BCounter) ->
     MyDCId = dc_meta_data_utilities:get_my_dc_id(),
     gen_server:call(?MODULE, {consume, Key, {decrement, {V, MyDCId}}, BCounter});
 
 %% @doc Processes an increment operation for the bounded counter.
 %% Operation is always safe.
-generate_downstream(_Key, {increment, {Amount, _}}, BCounter) ->
+generate_downstream(_Key, {increment, Amount}, BCounter) ->
     MyDCId = dc_meta_data_utilities:get_my_dc_id(),
     ?DATA_TYPE:downstream({increment, {Amount, MyDCId}}, BCounter);
 
