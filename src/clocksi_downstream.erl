@@ -62,6 +62,8 @@ generate_downstream_op(Transaction, IndexNode, Key, Type, Update, WriteSet) ->
                 antidote_crdt_counter_b ->
                     %% bcounter data-type.
                     bcounter_mgr:generate_downstream(Key, Update, Snapshot);
+                antidote_crdt_counter_b_secure ->
+                    secure_bcounter_mgr:generate_downstream(Key, Update, Snapshot);
                 _ ->
                     Type:downstream(Update, Snapshot)
             end
