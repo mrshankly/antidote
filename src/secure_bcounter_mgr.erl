@@ -41,18 +41,18 @@
 
 %% @doc Processes an increment operation for the bounded counter.
 generate_downstream(_Key, {increment, {Amount, NSquare}}, SecureBCounter) ->
-    MyDCId = dc_meta_data_utilities:get_my_dc_id(),
+    MyDCId = dc_utilities:get_my_dc_id(),
     ?DATA_TYPE:downstream({increment, {Amount, NSquare, MyDCId}}, SecureBCounter);
 generate_downstream(_Key, {increment, Amount}, SecureBCounter) ->
-    MyDCId = dc_meta_data_utilities:get_my_dc_id(),
+    MyDCId = dc_utilities:get_my_dc_id(),
     ?DATA_TYPE:downstream({increment, {Amount, MyDCId}}, SecureBCounter);
 
 %% @doc Processes a decrement operation for a secure bounded counter.
 generate_downstream(_Key, {decrement, {Amount, NSquare}}, SecureBCounter) ->
-    MyDCId = dc_meta_data_utilities:get_my_dc_id(),
+    MyDCId = dc_utilities:get_my_dc_id(),
     ?DATA_TYPE:downstream({decrement, {Amount, NSquare, MyDCId}}, SecureBCounter);
 generate_downstream(_Key, {decrement, Amount}, SecureBCounter) ->
-    MyDCId = dc_meta_data_utilities:get_my_dc_id(),
+    MyDCId = dc_utilities:get_my_dc_id(),
     ?DATA_TYPE:downstream({decrement, {Amount, MyDCId}}, SecureBCounter);
 
 %% @doc Processes a trasfer operation between two owners of the

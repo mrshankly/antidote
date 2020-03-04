@@ -1,17 +1,15 @@
 %% -*- erlang -*-
 {application, antidote, [
     {description, "A transactional CRDT database"},
-    {vsn, "0.2.1"},
+    {vsn, "0.2.2"},
     {applications, [
         kernel,
         stdlib,
         riak_core,
-        cuttlefish,
         erlzmq,
         runtime_tools,
         tools,
-        antidote_stats,
-        lager
+        antidote_stats
     ]},
     {included_applications, [
         vectorclock,

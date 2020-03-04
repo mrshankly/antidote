@@ -32,6 +32,8 @@
 -include("antidote.hrl").
 -include_lib("kernel/include/logger.hrl").
 
+-export([update_status/0]).
+
 %% gen_event callbacks
 -export([init/1, handle_event/2, handle_call/2,
          handle_info/2, terminate/2, code_change/3]).
@@ -41,8 +43,17 @@ init([]) ->
     update_status(),
     {ok, #state{}}.
 
-handle_event({ring_update, _Ring}, State) ->
-    ?LOG_INFO("Ring update~n~p", [riak_core_cluster_cli:status(ok, [], [])]),
+handle_event({ring_update, _}, State) ->
+    {ok, Ring} = riak_core_ring_manager:get_my_ring(),
+    Members = riak_core_ring:all_members(Ring),
+    {Claimant, RingReady, Down, MarkedDown, Changes} = riak_core_status:ring_status(),
+    ?LOG_NOTICE("Ring is changing!\nClaimant: ~p\nReady: ~p\nNodes down: ~p\nMarked down: ~p\nChanges: ~p\nClaimed: ~p\nPending: ~p", [
+        Claimant, RingReady, Down, MarkedDown, length(Changes),
+        [{Node, claim_percent(Ring, Node)} || Node <- Members],
+        [{Node, future_claim_percentage(Changes, Ring, Node)} || Node <- Members]
+    ]),
+
+%% ring status
     update_status(),
     {ok, State}.
 
