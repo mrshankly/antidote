@@ -44,14 +44,14 @@
 %% @doc Creates an empty CRDT
 -spec create_snapshot(type()) -> snapshot().
 create_snapshot(Type) ->
-    Type:new().
+    antidote_crdt:new(Type).
 
 %% @doc Applies an downstream effect to a snapshot of a crdt.
 %%      This function yields an error if the crdt does not have a corresponding update operation.
 -spec update_snapshot(type(), snapshot(), effect()) -> {ok, snapshot()} | {error, reason()}.
 update_snapshot(Type, Snapshot, Op) ->
     try
-        Type:update(Op, Snapshot)
+        antidote_crdt:update(Type, Op, Snapshot)
     catch
         _:_ ->
             {error, {unexpected_operation, Op, Type}}
@@ -88,7 +88,7 @@ check_operation(Op) ->
     case Op of
         {update, {_, Type, Update}} ->
             antidote_crdt:is_type(Type) andalso
-                Type:is_operation(Update);
+                antidote_crdt:is_operation(Type, Update);
         {read, {_, Type}} ->
             antidote_crdt:is_type(Type);
         _ ->
