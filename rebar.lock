@@ -2,7 +2,7 @@
 [{<<"accept">>,{pkg,<<"accept">>,<<"0.3.0">>},2},
  {<<"antidote_crdt">>,
   {git,"https://github.com/mrshankly/antidote_crdt",
-       {ref,"a650953793a5b1ec220604af037b7492dfc3893d"}},
+       {ref,"11843b354ffdbb8a7f0e22a484bc8693c49a6ae9"}},
   0},
  {<<"antidote_pb_codec">>,
   {git,"https://github.com/mrshankly/antidote_pb_codec",
