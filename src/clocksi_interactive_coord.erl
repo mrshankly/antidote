@@ -682,22 +682,24 @@ execute_command(read_objects, Objects, Sender, State = #state{transaction=Transa
 %% @doc Perform update operations on a batch of Objects
 execute_command(update_objects, UpdateOps, Sender, State = #state{transaction=Transaction}) ->
     ExecuteUpdates = fun(Op, AccState=#state{
-        client_ops = ClientOps0,
-        updated_partitions = UpdatedPartitions0
-    }) ->
-        case perform_update(Op, UpdatedPartitions0, Transaction, Sender, ClientOps0) of
-            {error, _} = Err ->
-                AccState#state{return_accumulator = Err};
-
-            {UpdatedPartitions, ClientOps} ->
-                NumToRead = AccState#state.num_to_read,
-                AccState#state{
-                    client_ops = ClientOps,
-                    num_to_read = NumToRead + 1,
-                    updated_partitions = UpdatedPartitions
-                }
-        end
-                     end,
+            client_ops = ClientOps0,
+            updated_partitions = UpdatedPartitions0
+        }) ->
+            try
+                perform_update(Op, UpdatedPartitions0, Transaction, Sender, ClientOps0)
+            of
+                {UpdatedPartitions, ClientOps, NumOfUpds} ->
+                    NumToRead = AccState#state.num_to_read,
+                    AccState#state{
+                        client_ops = ClientOps,
+                        num_to_read = NumToRead + NumOfUpds,
+                        updated_partitions = UpdatedPartitions
+                    }
+            catch
+                throw:{error, Reason} ->
+                    AccState#state{return_accumulator = {error, Reason}}
+            end
+    end,
 
     NewCoordState = lists:foldl(
         ExecuteUpdates,
@@ -705,7 +707,7 @@ execute_command(update_objects, UpdateOps, Sender, State = #state{transaction=Tr
         UpdateOps
     ),
 
-    LoggingState = NewCoordState#state{from=Sender},
+    LoggingState = NewCoordState#state{from = Sender},
     case LoggingState#state.num_to_read > 0 of
         true ->
             {next_state, receive_logging_responses, LoggingState};
@@ -878,54 +880,82 @@ perform_read({Key, Type}, UpdatedPartitions, Transaction, Sender) ->
     end.
 
 perform_update(Op, UpdatedPartitions, Transaction, _Sender, ClientOps) ->
-    ?STATS(operation_update),
     {Key, Type, Update} = Op,
+
+    %% Execute pre_commit_hook if any
+    case antidote_hooks:execute_pre_commit_hook(Key, Type, Update, {Transaction, UpdatedPartitions}) of
+        {error, Reason} ->
+            ?STATS(operation_update),
+            ?LOG_DEBUG("Execute pre-commit hook failed ~p", [Reason]),
+            throw({error, Reason});
+
+        PostHookUpdates when is_list(PostHookUpdates) ->
+            lists:foldl(fun({Key1, Type1, Update1}, {CurrUpdatedPartitions, CurrUpdatedOps, TotalUpds}) ->
+                ?STATS(operation_update),
+
+                NewState = generate_new_state(Key1, Type1, Update1,
+                    CurrUpdatedPartitions, Transaction, CurrUpdatedOps),
+
+                case NewState of
+                    {error, Reason} ->
+                        throw({error, Reason});
+                    {NewUpdatedPartitions, UpdatedOps} ->
+                        {NewUpdatedPartitions, UpdatedOps, TotalUpds + 1}
+                end
+            end, {UpdatedPartitions, ClientOps, 0}, PostHookUpdates);
+
+        {Key, Type, PostHookUpdate} ->
+            ?STATS(operation_update),
+
+            NewState = generate_new_state(Key, Type, PostHookUpdate,
+                UpdatedPartitions, Transaction, ClientOps),
+
+            case NewState of
+                {error, Reason} ->
+                    throw({error, Reason});
+                {NewUpdatedPartitions, UpdatedOps} ->
+                    {NewUpdatedPartitions, UpdatedOps, 1}
+            end
+    end.
+
+generate_new_state(Key, Type, HookUpdate, Partitions, Transaction, Ops) ->
     Partition = ?LOG_UTIL:get_key_partition(Key),
 
-    WriteSet = case lists:keyfind(Partition, 1, UpdatedPartitions) of
+    WriteSet = case lists:keyfind(Partition, 1, Partitions) of
                    false ->
                        [];
                    {Partition, WS} ->
                        WS
                end,
 
-    %% Execute pre_commit_hook if any
-    case antidote_hooks:execute_pre_commit_hook(Key, Type, Update) of
+    %% Generate the appropriate state operations based on older snapshots
+    GenerateResult = ?CLOCKSI_DOWNSTREAM:generate_downstream_op(
+        Transaction,
+        Partition,
+        Key,
+        Type,
+        HookUpdate,
+        WriteSet
+    ),
+
+    case GenerateResult of
         {error, Reason} ->
-            ?LOG_DEBUG("Execute pre-commit hook failed ~p", [Reason]),
             {error, Reason};
 
-        {Key, Type, PostHookUpdate} ->
+        {ok, DownstreamOp} ->
+            ok = async_log_propagation(Partition, Transaction#transaction.txn_id, Key, Type, DownstreamOp),
 
-            %% Generate the appropriate state operations based on older snapshots
-            GenerateResult = ?CLOCKSI_DOWNSTREAM:generate_downstream_op(
-                Transaction,
+            %% Append to the write set of the updated partition
+            GeneratedUpdate = {Key, Type, DownstreamOp},
+            NewUpdatedPartitions = append_updated_partitions(
+                Partitions,
+                WriteSet,
                 Partition,
-                Key,
-                Type,
-                PostHookUpdate,
-                WriteSet
+                GeneratedUpdate
             ),
 
-            case GenerateResult of
-                {error, Reason} ->
-                    {error, Reason};
-
-                {ok, DownstreamOp} ->
-                    ok = async_log_propagation(Partition, Transaction#transaction.txn_id, Key, Type, DownstreamOp),
-
-                    %% Append to the write set of the updated partition
-                    GeneratedUpdate = {Key, Type, DownstreamOp},
-                    NewUpdatedPartitions = append_updated_partitions(
-                        UpdatedPartitions,
-                        WriteSet,
-                        Partition,
-                        GeneratedUpdate
-                    ),
-
-                    UpdatedOps = [{Key, Type, PostHookUpdate} | ClientOps],
-                    {NewUpdatedPartitions, UpdatedOps}
-            end
+            UpdatedOps = [{Key, Type, HookUpdate} | Ops],
+            {NewUpdatedPartitions, UpdatedOps}
     end.
 
 

@@ -318,11 +318,14 @@ execute_util(read_async, Args, Sender, _State) ->
 
 receive_read_async(cast, Response, _State = #state{from = Sender, meta = WriteSet}) ->
     case Response of
-        {ok, {_, Key, Type, Snapshot}} ->
+        {ok, {Key, Type, Snapshot}} ->
             Updates2 = clocksi_vnode:reverse_and_filter_updates_per_key(WriteSet, Key),
             Snapshot2 = clocksi_materializer:materialize_eager(Type, Snapshot, Updates2),
             {next_state, execute, #state{from = undefined},
                 [{reply, Sender, {ok, Snapshot2}}]};
+        {ok, {_, _Key, _Type, _Snapshot}} ->
+            % Maybe this case is no longer relevant???
+            throw(old_response);
         {error, Reason} ->
             {next_state, execute, #state{from = undefined},
                 [{reply, Sender, {error, Reason}}]}

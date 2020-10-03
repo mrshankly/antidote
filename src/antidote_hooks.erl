@@ -78,6 +78,7 @@
 
 -export([test_commit_hook/1,
          test_increment_hook/1,
+         test_increment_hook/2,
          test_post_hook/1]).
 
 
@@ -151,9 +152,8 @@ execute_pre_commit_hook(Key, Type, Param) ->
 -spec execute_pre_commit_hook([{term(), type(), op_param()}]) ->
     [{term(), type(), op_param()} | [{term(), type(), op_param()}] | {error, reason()}].
 execute_pre_commit_hook(Updates) when is_list(Updates) ->
-    lists:map(fun(Upd) ->
-        {{Key, Bucket}, Type, Param} = Upd,
-        execute_pre_commit_hook({Key, Bucket}, Type, Param)
+    lists:map(fun({Key, Type, Param}) ->
+        execute_pre_commit_hook(Key, Type, Param)
     end, Updates).
 
 -spec execute_pre_commit_hook(term(), type(), op_param(), txid() | {term(), term()}) ->
@@ -207,6 +207,8 @@ test_commit_hook(Object) ->
 
 test_increment_hook({{Key, Bucket}, antidote_crdt_counter_pn, {increment, 1}}) ->
     {ok, {{Key, Bucket}, antidote_crdt_counter_pn, {increment, 2}}}.
+test_increment_hook({Key, Type, Op}, _Transaction) ->
+    test_increment_hook({Key, Type, Op}).
 
 test_post_hook({{Key, Bucket}, Type, OP}) ->
     {ok, _CT} = antidote:update_objects(ignore, [], [{{Key, antidote_crdt_counter_pn, commitcount}, increment, 1}]),
