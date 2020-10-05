@@ -309,9 +309,9 @@ prepare_records(Columns, Table, Records) ->
     TColumns = table_utils:columns(Table),
     BCounterCols = lists:foldl(fun(ColName, AccCols) ->
         case maps:get(ColName, TColumns) of
-            {_, ?AQL_COUNTER_INT, _} = Col ->
+            {_, ?AQL_COUNTER_INT, _, _} = Col ->
                 lists:append(AccCols, [Col]);
-            _Else ->
+            {_, _, _, _} ->
                 AccCols
         end
     end, [], Columns),
@@ -319,7 +319,7 @@ prepare_records(Columns, Table, Records) ->
 
 prepare_records0(BCounterCols, [Record | Records], Acc) ->
     NewBCounter = ?CRDT_BCOUNTER_INT:new(),
-    NewObj = lists:foldl(fun({BCounterName, _, _}, AccRecord) ->
+    NewObj = lists:foldl(fun({BCounterName, _, _, _}, AccRecord) ->
         case record_utils:get_column(BCounterName, AccRecord) of
             undefined ->
                 lists:append(AccRecord, [?ATTRIBUTE(BCounterName, ?CRDT_BCOUNTER_INT, NewBCounter)]);
