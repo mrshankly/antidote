@@ -42,6 +42,7 @@
     asynchronous_test_five/1,
     a_lot_of_locks_per_transaction_one/1,
     a_lot_of_locks_per_transaction_two/1,
+    interleaved_transactions_with_shared_lock/1,
     cluster_failure_test_one/1,
     cluster_failure_test_two/1
 ]).
@@ -97,6 +98,7 @@ all() -> [
     asynchronous_test_five,
     a_lot_of_locks_per_transaction_one,
     a_lot_of_locks_per_transaction_two,
+    interleaved_transactions_with_shared_lock,
     cluster_failure_test_one
 %%    cluster_failure_test_2 % sometimes fails, probably because read servers are not restarted properly
 ].
@@ -611,6 +613,27 @@ generate_lock_helper(Amount, String, List) ->
         _ -> New_List
     end.
 
+interleaved_transactions_with_shared_lock(Config) ->
+    [Node | _Nodes] = proplists:get_value(nodes, Config),
+
+    Lock = interleaved_shared_lock,
+    Type = antidote_crdt_counter_pn,
+    Bucket = antidote_bucket,
+    Object = {interleaved_transactions_with_shared_lock_key, Type, Bucket},
+
+    {ok, T1} = rpc:call(Node, antidote, start_transaction, [ignore, [{shared_locks, [Lock]}]]),
+    txn_seq_update_check(Node, T1, [{Object, increment, 1}]),
+
+    {ok, T2} = rpc:call(Node, antidote, start_transaction, [ignore, [{shared_locks, [Lock]}]]),
+    txn_seq_update_check(Node, T2, [{Object, increment, 2}]),
+
+    {ok, _} = rpc:call(Node, antidote, commit_transaction, [T1]),
+    {ok, Clock} = rpc:call(Node, antidote, commit_transaction, [T2]),
+
+    {ok, TxId} = rpc:call(Node, antidote, start_transaction, [Clock, []]),
+    {ok, Res} = rpc:call(Node, antidote, read_objects, [[Object], TxId]),
+    {ok, _} = rpc:call(Node, antidote, commit_transaction, [TxId]),
+    ?assertEqual([3], Res).
 
 %% Starts a transaction that acquires a lock on one node. Then this node is killed and restarted.
 %% Then another transaction is started on another Node using the same lock.
@@ -680,6 +703,3 @@ txn_seq_update_check(Node, TxId, Updates) ->
         Res = rpc:call(Node, antidote, update_objects, [[Update], TxId]),
         ?assertMatch(ok, Res)
     end, Updates).
-
-
-
