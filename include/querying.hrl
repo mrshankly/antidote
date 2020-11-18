@@ -27,16 +27,21 @@
 %% Data types definitions
 -define(AQL_INTEGER, integer).
 -define(CRDT_INTEGER, antidote_crdt_register_lww).
+-define(SCRDT_INTEGER, antidote_crdt_secure_register_lww).
 
 -define(AQL_VARCHAR, varchar).
 -define(CRDT_VARCHAR, antidote_crdt_register_lww).
+-define(SCRDT_VARCHAR, antidote_crdt_secure_register_lww).
 
 -define(AQL_BOOLEAN, boolean).
 -define(CRDT_BOOLEAN, antidote_crdt_flag_ew).
+-define(SCRDT_BOOLEAN, antidote_crdt_secure_register_lww).
 
 -define(AQL_COUNTER_INT, counter_int).
 -define(CRDT_BCOUNTER_INT, antidote_crdt_counter_b).
+-define(SCRDT_BCOUNTER_INT, antidote_crdt_counter_b).
 -define(CRDT_COUNTER_INT, antidote_crdt_counter_pn).
+-define(SCRDT_COUNTER_INT, antidote_crdt_secure_counter_pn).
 
 %% Indexes definitions
 -define(INDEX(IndexName, TableName, Attributes), {IndexName, TableName, Attributes}).

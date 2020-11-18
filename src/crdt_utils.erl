@@ -45,16 +45,14 @@
 
 %% API
 -export([to_insert_op/2,
-    type_to_crdt/2,
+    type_to_crdt/3,
     create_crdt_update/3,
     convert_value/2]).
 
 to_insert_op(?CRDT_VARCHAR, Value) -> {assign, Value};
-to_insert_op(?CRDT_BOOLEAN, Value) ->
-    case Value of
-        true -> {enable, {}};
-        false -> {disable, {}}
-    end;
+to_insert_op(?SCRDT_VARCHAR, Value) -> {assign, Value}; % works for integer, varchar and boolean
+to_insert_op(?CRDT_BOOLEAN, true) -> {enable, {}};
+to_insert_op(?CRDT_BOOLEAN, false) -> {disable, {}};
 to_insert_op(?CRDT_BCOUNTER_INT, {Inc, Dec})
     when is_list(Inc) andalso is_list(Dec) ->
     IncList = orddict:to_list(Inc),
@@ -70,11 +68,16 @@ to_insert_op(?CRDT_COUNTER_INT, Value) ->
     increment_counter(Value);
 to_insert_op(_, _) -> {error, invalid_crdt}.
 
-type_to_crdt(?AQL_INTEGER, _) -> ?CRDT_INTEGER;
-type_to_crdt(?AQL_BOOLEAN, _) -> ?CRDT_BOOLEAN;
-type_to_crdt(?AQL_COUNTER_INT, {_, _}) -> ?CRDT_BCOUNTER_INT;
-type_to_crdt(?AQL_COUNTER_INT, _) -> ?CRDT_COUNTER_INT;
-type_to_crdt(?AQL_VARCHAR, _) -> ?CRDT_VARCHAR.
+type_to_crdt(?AQL_INTEGER, plain, _) -> ?CRDT_INTEGER;
+type_to_crdt(?AQL_INTEGER, _, _) -> ?SCRDT_INTEGER;
+type_to_crdt(?AQL_BOOLEAN, plain, _) -> ?CRDT_BOOLEAN;
+type_to_crdt(?AQL_BOOLEAN, _, _) -> ?SCRDT_BOOLEAN;
+type_to_crdt(?AQL_COUNTER_INT, plain, {_, _}) -> ?CRDT_BCOUNTER_INT;
+type_to_crdt(?AQL_COUNTER_INT, _, {_, _}) -> ?SCRDT_BCOUNTER_INT;
+type_to_crdt(?AQL_COUNTER_INT, plain, _) -> ?CRDT_COUNTER_INT;
+type_to_crdt(?AQL_COUNTER_INT, _, _) -> ?SCRDT_COUNTER_INT;
+type_to_crdt(?AQL_VARCHAR, plain, _) -> ?CRDT_VARCHAR;
+type_to_crdt(?AQL_VARCHAR, _, _) -> ?SCRDT_VARCHAR.
 
 create_crdt_update({_Key, ?CRDT_MAP, _Bucket} = ObjKey, UpdateOp, Value) ->
     Update = map_update(Value),

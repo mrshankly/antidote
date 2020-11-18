@@ -291,9 +291,9 @@ create_pindex_update(ObjBoundKey, Updates, Table, PIndexKey, Transaction) ->
         {_, i} -> %% We only update the indexes on row insertion
             TableCols = table_utils:columns(Table),
             [PKName] = table_utils:primary_key_name(Table),
-            {PKName, PKType, _PKEnc, _Constraint} = maps:get(PKName, TableCols),
+            {PKName, PKType, PKEnc, _Constraint} = maps:get(PKName, TableCols),
             % TODO Update this function to use the encryption type.
-            PKCRDT = crdt_utils:type_to_crdt(PKType, ignore),
+            PKCRDT = crdt_utils:type_to_crdt(PKType, PKEnc, ignore),
 
             ConvPKey = case proplists:get_value({PKName, PKCRDT}, Updates) of
                            {_Op, Value} ->
