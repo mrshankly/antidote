@@ -43,6 +43,7 @@
 -export([
          start_transaction/2,
          commit_transaction/1,
+         commit_transaction/2,
          abort_transaction/1,
          read_objects/2,
          get_objects/2,
@@ -74,7 +75,10 @@ abort_transaction(TxId) ->
 -spec commit_transaction(txid()) ->
                                 {ok, snapshot_time()} | {error, reason()}.
 commit_transaction(TxId) ->
-    case clocksi_full_icommit(TxId) of
+    commit_transaction(TxId, []).
+
+commit_transaction(TxId, Properties) ->
+    case clocksi_full_icommit(TxId, Properties) of
         {ok, {_TxId, CommitTime}} ->
             {ok, CommitTime};
         {error, Reason} ->
@@ -204,10 +208,10 @@ clocksi_istart_tx(Clock, Properties) ->
     gen_statem:call(Pid, {start_tx, Clock, Properties}).
 
 
--spec clocksi_full_icommit(txid()) -> {aborted, txid()} | {ok, {txid(), snapshot_time()}}
+-spec clocksi_full_icommit(txid(), txn_properties()) -> {aborted, txid()} | {ok, {txid(), snapshot_time()}}
                                           | {error, reason()}.
-clocksi_full_icommit(TxId)->
-    case gen_statem:call(TxId#tx_id.server_pid, {prepare, empty}, ?OP_TIMEOUT) of
+clocksi_full_icommit(TxId, Properties)->
+    case gen_statem:call(TxId#tx_id.server_pid, {prepare, {empty, Properties}}, ?OP_TIMEOUT) of
         {ok, _PrepareTime} ->
             gen_statem:call(TxId#tx_id.server_pid, commit, ?OP_TIMEOUT);
         Msg ->

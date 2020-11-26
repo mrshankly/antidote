@@ -45,6 +45,7 @@
           update_objects/3,
           abort_transaction/1,
           commit_transaction/1,
+          commit_transaction/2,
           create_bucket/2,
           create_object/3,
           delete_object/1,
@@ -143,6 +144,10 @@ abort_transaction(TxId) ->
 commit_transaction(TxId) ->
     cure:commit_transaction(TxId).
 %% TODO: Execute post_commit hooks here?
+
+-spec commit_transaction(TxId::txid(), Properties::txn_properties()) -> {ok, snapshot_time()} | {error, reason()}.
+commit_transaction(TxId, Properties) ->
+    cure:commit_transaction(TxId, Properties).
 
 -spec read_objects(Objects::[bound_object()], TxId::txid())
                   -> {ok, [term()]} | {error, reason()}.

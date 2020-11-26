@@ -627,8 +627,8 @@ interleaved_transactions_with_shared_lock(Config) ->
     {ok, T2} = rpc:call(Node, antidote, start_transaction, [ignore, [{shared_locks, [Lock]}]]),
     txn_seq_update_check(Node, T2, [{Object, increment, 2}]),
 
-    {ok, _} = rpc:call(Node, antidote, commit_transaction, [T1]),
-    {ok, Clock} = rpc:call(Node, antidote, commit_transaction, [T2]),
+    {ok, _} = rpc:call(Node, antidote, commit_transaction, [T1, [{certify, dont_certify}]]),
+    {ok, Clock} = rpc:call(Node, antidote, commit_transaction, [T2, [{certify, dont_certify}]]),
 
     {ok, TxId} = rpc:call(Node, antidote, start_transaction, [Clock, []]),
     {ok, Res} = rpc:call(Node, antidote, read_objects, [[Object], TxId]),

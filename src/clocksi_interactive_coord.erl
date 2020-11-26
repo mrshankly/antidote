@@ -641,6 +641,10 @@ create_transaction_record(ClientClock, _IsStatic, Properties) ->
 
 %% @doc Execute the commit protocol
 -spec execute_command(atom(), term(), gen_statem:from(), state()) -> gen_statem:event_handler_result(state()).
+execute_command(prepare, {Protocol, NewProperties}, Sender, State0 = #state{properties=Properties}) ->
+    State = State0#state{from=Sender, commit_protocol=Protocol, properties=NewProperties ++ Properties},
+    prepare(State);
+
 execute_command(prepare, Protocol, Sender, State0) ->
     State = State0#state{from=Sender, commit_protocol=Protocol},
     prepare(State);
