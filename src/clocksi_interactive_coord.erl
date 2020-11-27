@@ -667,17 +667,25 @@ execute_command(read, {Key, Type}, Sender, State = #state{
 
 %% @doc Read a batch of objects, asynchronous
 execute_command(read_objects, Objects, Sender, State = #state{transaction=Transaction}) ->
-    ExecuteReads = fun({Key, Type}, AccState) ->
+    ExecuteReads = fun(Object, {ReqNum, AccState}) ->
         ?STATS(operation_read_async),
-        Partition = ?LOG_UTIL:get_key_partition(Key),
-        ok = clocksi_vnode:async_read_data_item(Partition, Transaction, Key, Type),
-        ReadKeys = AccState#state.return_accumulator,
-        AccState#state{return_accumulator=[Key | ReadKeys]}
-                   end,
+        case Object of
+            {Key, Type, Function} ->
+                Partition = ?LOG_UTIL:get_key_partition(Key),
+                ok = clocksi_vnode:async_read_data_function(Partition, Transaction, ReqNum, Key, Type, Function),
+                ReadKeys = AccState#state.return_accumulator,
+                {ReqNum + 1, AccState#state{return_accumulator = [Key | ReadKeys]}};
+            {Key, Type} ->
+                Partition = ?LOG_UTIL:get_key_partition(Key),
+                ok = clocksi_vnode:async_read_data_item(Partition, Transaction, ReqNum, Key, Type),
+                ReadKeys = AccState#state.return_accumulator,
+                {ReqNum + 1, AccState#state{return_accumulator = [Key | ReadKeys]}}
+        end
+    end,
 
-        NewCoordState = lists:foldl(
+    {_, NewCoordState} = lists:foldl(
         ExecuteReads,
-        State#state{num_to_read = length(Objects), return_accumulator=[]},
+        {0, State#state{num_to_read = length(Objects), return_accumulator = []}},
         Objects
     ),
 
