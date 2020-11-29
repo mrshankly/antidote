@@ -114,15 +114,18 @@ read_data_item(Node, TxId, Key, Type, Updates) ->
 async_read_data_item(Node, TxId, Key, Type) ->
     clocksi_readitem:async_read_data_item(Node, Key, Type, TxId, [], {fsm, self()}).
 
-async_read_data_item(Node, TxId, ReqNum, Key, Type) ->
-    clocksi_readitem_server:async_read_data_item(Node, ReqNum, Key, Type, TxId, [], {fsm, self()}).
+async_read_data_item(Node, TxId, _ReqNum, Key, Type) ->
+    clocksi_readitem:async_read_data_item(Node, Key, Type, TxId, [], {fsm, self()}).
+    % clocksi_readitem_server:async_read_data_item(Node, ReqNum, Key, Type, TxId, [], {fsm, self()}).
 
 async_read_data_function(Node, TxId, Key, Type, Function) ->
     async_read_data_function(Node, TxId, 0, Key, Type, Function).
 
-async_read_data_function(Node, TxId, ReqNum, Key, Type, Function) ->
-    clocksi_readitem_server:async_read_data_function(
-        Node, ReqNum, Key, Type, Function, TxId, [], {fsm, self()}).
+async_read_data_function(Node, TxId, _ReqNum, Key, Type, Function) ->
+    logger:info("FUNCTION: ~p", [Function]),
+    clocksi_readitem:async_read_data_item(Node, Key, Type, TxId, [], {fsm, self()}).
+    % clocksi_readitem_server:async_read_data_function(
+    %     Node, ReqNum, Key, Type, Function, TxId, [], {fsm, self()}).
 
 %% @doc Return active transactions in prepare state with their preparetime for a given key
 %% should be run from same physical node
