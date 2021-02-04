@@ -128,10 +128,10 @@ perform_singleitem_operation(Clock, Key, Type, Properties) ->
     end.
 
 perform_singleitem_operation(Clock, Key, Type, Operation, Properties) ->
-     Transaction = create_transaction_record(Clock, true, Properties),
+    Transaction = create_transaction_record(Clock, true, Properties),
     Preflist = log_utilities:get_preflist_from_key(Key),
     IndexNode = hd(Preflist),
-    case clocksi_readitem_server:read_data_item(IndexNode, Key, Type, Operation, Transaction, []) of
+    case clocksi_readitem:read_data_item(IndexNode, Key, Type, Transaction, []) of
         {error, Reason} ->
             {error, Reason};
         {ok, Snapshot} ->
@@ -445,15 +445,32 @@ receive_aborted(info, {_EventType, EventValue}, State) ->
 %%%== receive_read_objects_result
 
 %% @doc After asynchronously reading a batch of keys, collect the responses here
-receive_read_objects_result(cast, {ok, {Key, Type, Snapshot}}, CoordState = #state{
+receive_read_objects_result(cast, {ok, Response}, CoordState = #state{
     num_to_read = NumToRead,
     return_accumulator = ReadKeys
 }) ->
+    {Key, Type, Snapshot, Properties} = case Response of
+        {K, T, S} -> {K, T, S, []};
+        {K, T, S, P} -> {K, T, S, P}
+    end,
+
     %% Apply local updates to the read snapshot
     UpdatedSnapshot = apply_tx_updates_to_snapshot(Key, CoordState, Type, Snapshot),
 
+    Values = case proplists:get_value(function, Properties) of
+        undefined ->
+            {state, UpdatedSnapshot};
+        Function ->
+            Value = case Type:is_operation(Function) of
+                true -> Type:value(Function, UpdatedSnapshot);
+                false -> {error, {function_not_supported, Function}}
+            end,
+            {value, Value}
+    end,
+
     %% Swap keys with their appropriate read values
-    ReadValues = replace_first(ReadKeys, Key, UpdatedSnapshot),
+    ReqNum = proplists:get_value(reqnum, Properties, 0),
+    ReadValues = replace_first(ReadKeys, Key, {{ReqNum, Key}, Values}),
 
     %% Loop back to the same state until we process all the replies
     case NumToRead > 1 of
@@ -677,12 +694,12 @@ execute_command(read_objects, Objects, Sender, State = #state{transaction=Transa
         case Object of
             {Key, Type, Function} ->
                 Partition = ?LOG_UTIL:get_key_partition(Key),
-                ok = clocksi_vnode:async_read_data_function(Partition, Transaction, ReqNum, Key, Type, Function),
+                ok = clocksi_vnode:async_read_data_item(Partition, Transaction, Key, Type, [{reqnum, ReqNum}, {function, Function}]),
                 ReadKeys = AccState#state.return_accumulator,
                 {ReqNum + 1, AccState#state{return_accumulator = [Key | ReadKeys]}};
             {Key, Type} ->
                 Partition = ?LOG_UTIL:get_key_partition(Key),
-                ok = clocksi_vnode:async_read_data_item(Partition, Transaction, ReqNum, Key, Type),
+                ok = clocksi_vnode:async_read_data_item(Partition, Transaction, Key, Type, [{reqnum, ReqNum}]),
                 ReadKeys = AccState#state.return_accumulator,
                 {ReqNum + 1, AccState#state{return_accumulator = [Key | ReadKeys]}}
         end

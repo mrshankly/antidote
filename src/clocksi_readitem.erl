@@ -37,8 +37,11 @@
 -endif.
 
 %% API
--export([read_data_item/5,
-    async_read_data_item/6]).
+-export([
+    read_data_item/5,
+    async_read_data_item/6,
+    async_read_data_item/7
+]).
 
 %% Internal
 -export([perform_read_internal/5]).
@@ -66,6 +69,17 @@ async_read_data_item({Partition, Node}, Key, Type, Transaction, PropertyList, {f
     } end),
     ok.
 
+-spec async_read_data_item(index_node(), key(), type(), tx(), read_property_list(), term(), [atom() | tuple()]) -> ok.
+async_read_data_item({Partition, Node}, Key, Type, Transaction, PropertyList, {fsm, Sender}, Args) ->
+    spawn_link(Node, fun() -> {
+        case perform_read_internal(Key, Type, Transaction, PropertyList, Partition) of
+            {ok, Snapshot} ->
+                gen_statem:cast(Sender, {ok, {Key, Type, Snapshot, Args}});
+            {error, Reason} ->
+                gen_statem:cast(Sender, {error, Reason})
+        end
+    } end),
+    ok.
 
 %%%===================================================================
 %%% Internal
@@ -127,8 +141,6 @@ return(Key, Type, Transaction, PropertyList, Partition) ->
     VecSnapshotTime = Transaction#transaction.vec_snapshot_time,
     TxId = Transaction#transaction.txn_id,
     materializer_vnode:read(Key, Type, VecSnapshotTime, TxId, PropertyList, Partition).
-
-
 
 -ifdef(TEST).
 

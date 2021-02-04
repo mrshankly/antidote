@@ -39,8 +39,6 @@
     read_data_item/5,
     async_read_data_item/4,
     async_read_data_item/5,
-    async_read_data_function/5,
-    async_read_data_function/6,
     get_cache_name/2,
     send_min_prepared/1,
     get_active_txns_key/2,
@@ -114,18 +112,12 @@ read_data_item(Node, TxId, Key, Type, Updates) ->
 async_read_data_item(Node, TxId, Key, Type) ->
     clocksi_readitem:async_read_data_item(Node, Key, Type, TxId, [], {fsm, self()}).
 
-async_read_data_item(Node, TxId, _ReqNum, Key, Type) ->
-    clocksi_readitem:async_read_data_item(Node, Key, Type, TxId, [], {fsm, self()}).
-    % clocksi_readitem_server:async_read_data_item(Node, ReqNum, Key, Type, TxId, [], {fsm, self()}).
-
-async_read_data_function(Node, TxId, Key, Type, Function) ->
-    async_read_data_function(Node, TxId, 0, Key, Type, Function).
-
-async_read_data_function(Node, TxId, _ReqNum, Key, Type, Function) ->
-    logger:info("FUNCTION: ~p", [Function]),
-    clocksi_readitem:async_read_data_item(Node, Key, Type, TxId, [], {fsm, self()}).
-    % clocksi_readitem_server:async_read_data_function(
-    %     Node, ReqNum, Key, Type, Function, TxId, [], {fsm, self()}).
+% Behaves exactly the same as async_read_data_item/4, with the exception of passing around
+% whatever is given in `Args` and sending them back to `self()`, which in this case should
+% be `clocksi_interactive_coord:receive_read_objects_result/3`. The format of `Args` is
+% kept, these functions don't care about that at all.
+async_read_data_item(Node, TxId, Key, Type, Args) ->
+    clocksi_readitem:async_read_data_item(Node, Key, Type, TxId, [], {fsm, self()}, Args).
 
 %% @doc Return active transactions in prepare state with their preparetime for a given key
 %% should be run from same physical node

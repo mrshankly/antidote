@@ -151,10 +151,16 @@ obtain_objects(Clock, Properties, Objects, StateOrValue) ->
     case SingleKey of
         true -> %% Execute the fast path
             FormattedObjects = format_read_params(Objects),
-            [{Key, Type}] = FormattedObjects,
-            {ok, Val, CommitTime} = clocksi_interactive_coord:
-                perform_singleitem_operation(Clock, Key, Type, Properties),
-            {ok, transform_reads([Val], StateOrValue, Objects), CommitTime};
+            case FormattedObjects of
+                [{Key, Type}] ->
+                    {ok, Val, CommitTime} =
+                        clocksi_interactive_coord:perform_singleitem_operation(Clock, Key, Type, Properties),
+                    {ok, transform_reads([{{0, Key}, {state, Val}}], StateOrValue, Objects), CommitTime};
+                [{Key, Type, Function}] ->
+                    {ok, _, Val, CommitTime} =
+                        clocksi_interactive_coord:perform_singleitem_operation(Clock, Key, Type, Function, Properties),
+                    {ok, transform_reads([{{0, Key}, {value, Val}}], StateOrValue, Objects), CommitTime}
+            end;
         false ->
             case application:get_env(antidote, txn_prot) of
                 {ok, clocksi} ->
@@ -187,13 +193,32 @@ obtain_objects(Clock, Properties, Objects, StateOrValue) ->
             end
         end.
 
-
 transform_reads(States, StateOrValue, Objects) ->
     case StateOrValue of
-            object_state -> States;
-            object_value -> lists:map(fun({State, {_Key, Type, _Bucket}}) ->
-                                          antidote_crdt:value(Type, State) end,
-                                      lists:zip(States, Objects))
+        object_state ->
+            {_, Result} = lists:foldl(fun(ReadObj, {Num, Acc}) ->
+                case ReadObj of
+                    {{K, _T, B}, {_Op, _Args}} ->
+                        {value, Value} = proplists:get_value({Num, {K, B}}, States),
+                        {Num + 1, lists:append(Acc, [Value])};
+                    {K, _T, B} ->
+                        {state, Snapshot} = proplists:get_value({Num, {K, B}}, States),
+                        {Num + 1, lists:append(Acc, [Snapshot])}
+                end
+            end, {0, []}, Objects),
+            Result;
+        object_value ->
+            {_, Result} = lists:foldl(fun(ReadObj, {Num, Acc}) ->
+                case ReadObj of
+                    {{K, _T, B}, {_Op, _Args}} ->
+                        {value, Value} = proplists:get_value({Num, {K, B}}, States),
+                        {Num + 1, lists:append(Acc, [Value])};
+                    {K, Type, B} ->
+                        {state, Snapshot} = proplists:get_value({Num, {K, B}}, States),
+                        {Num + 1, lists:append(Acc, [antidote_crdt:value(Type, Snapshot)])}
+                end
+            end, {0, []}, Objects),
+            Result
     end.
 
 %% @doc Starts a new ClockSI interactive transaction.
