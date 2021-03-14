@@ -379,12 +379,25 @@ interpret_index({primary, TName}, Table, RangeQueries, TxId) ->
         ordsets:add_element(BoundObj, Set)
     end, ordsets:new(), IdxData);
 
-%% TODO support more columns
 interpret_index({secondary, {Name, TName, [Col]}}, Table, RangeQueries, TxId) ->
     GetRange = range_queries:lookup_range(Col, RangeQueries),
 
     IdxData = filter_index(GetRange, secondary, {TName, Name}, Table, TxId),
 
+    lists:foldl(fun({_IdxCol, PKs}, Set) ->
+        ordsets:union(Set, PKs)
+    end, ordsets:new(), IdxData);
+
+interpret_index({secondary, {Name, TName, Columns}}, Table, RangeQueries, TxId) ->
+    Ranges = lists:map(fun(Column) ->
+        range_queries:lookup_range(Column, RangeQueries)
+    end, Columns),
+    Values = lists:foldl(fun({{{greatereq, Val}, {lessereq, Val}}, _}, Acc) ->
+        [Val | Acc]
+    end, [], Ranges),
+    V = list_to_tuple(lists:reverse(Values)),
+    GetRange = {{{greatereq, V}, {lessereq, V}}, []},
+    IdxData = filter_index(GetRange, secondary, {TName, Name}, Table, TxId),
     lists:foldl(fun({_IdxCol, PKs}, Set) ->
         ordsets:union(Set, PKs)
     end, ordsets:new(), IdxData).

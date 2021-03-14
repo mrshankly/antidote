@@ -139,11 +139,8 @@ execute_pre_commit_hook({Key, Bucket}, Type, Param) ->
         undefined ->
             {{Key, Bucket}, Type, Param};
         {Module, Function} ->
-            try Module:Function({{Key, Bucket}, Type, Param}) of
-                {ok, Res} -> Res
-            catch
-                _:Reason -> {error, {pre_commit_hook, {Reason, Module, Function}}}
-            end
+            {ok, Res} = Module:Function({{Key, Bucket}, Type, Param}),
+            Res
     end;
 %% The following is kept to be backward compatible with the old
 %% interface where buckets are not used
@@ -164,11 +161,8 @@ execute_pre_commit_hook({Key, Bucket}, Type, Param, Transaction) ->
         undefined ->
             {{Key, Bucket}, Type, Param};
         {Module, Function} ->
-            try Module:Function({{Key, Bucket}, Type, Param}, Transaction) of
-                {ok, Res} -> Res
-            catch
-                _:Reason -> {error, {pre_commit_hook, {Reason, Module, Function}}}
-            end
+            {ok, Res} = Module:Function({{Key, Bucket}, Type, Param}, Transaction),
+            Res
     end;
 execute_pre_commit_hook(Key, Type, Param, _TxId) ->
     {Key, Type, Param}.
@@ -213,5 +207,3 @@ test_increment_hook({Key, Type, Op}, _Transaction) ->
 test_post_hook({{Key, Bucket}, Type, OP}) ->
     {ok, _CT} = antidote:update_objects(ignore, [], [{{Key, antidote_crdt_counter_pn, commitcount}, increment, 1}]),
     {ok, {{Key, Bucket}, Type, OP}}.
-
-

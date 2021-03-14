@@ -176,7 +176,7 @@ generate_index_updates(Key, Type, Bucket, Param, Transaction) ->
                     [PIdxKey] = querying_utils:build_keys(PIdxName, ?PINDEX_DT, ?AQL_METADATA_BUCKET),
 
                     PIdxUpdate = create_pindex_update(ObjBoundKey, Updates, Table, PIdxKey, Transaction),
-                    PrepareIdxUpdates = build_index_updates(Updates, ObjBoundKey, Table, []),
+                    PrepareIdxUpdates = build_index_updates(Updates, ObjBoundKey, Table),
                     SIdxUpdates = create_sindex_updates(PrepareIdxUpdates, Transaction),
 
                     case PIdxUpdate of
@@ -197,51 +197,116 @@ fill_index(ObjUpdate, Table, Transaction) ->
         Indexes when is_list(Indexes) ->
             lists:foldl(fun(Index, Acc) ->
                 % A new index was created in the update
-                ?INDEX(IndexName, TableName, [IndexedColumn]) = Index, %% TODO support more than one column
+                ?INDEX(IndexName, TableName, IndexedColumns) = Index,
                 {ok, PIndexObject} = index_manager:read_index(primary, TableName, Transaction),
 
                 IdxUpds = lists:map(fun({RawKey, BoundKey}) ->
                     case record_utils:record_data(BoundKey, Transaction) of
                         [] -> [];
                         [Record] ->
-                            ?ATTRIBUTE(_ColName, Type, Value) = record_utils:get_column(IndexedColumn, Record),
                             AtomKey = querying_utils:to_atom(RawKey),
+                            % Create a pointer to row.
                             BObjOp = crdt_utils:to_insert_op(?CRDT_VARCHAR, BoundKey),
-                            IndexValOp = crdt_utils:to_insert_op(Type, Value),
-                            IndexValOps =
-                                case is_list(IndexValOp) of
-                                    true -> lists:map(fun(IdxOp) -> {index_val, Type, IdxOp} end, IndexValOp);
-                                    false -> [{index_val, Type, IndexValOp}]
-                                end,
-                            Op = lists:append([{bound_obj, ?FIELD_BOBJ_DT, BObjOp}], IndexValOps),
-                            ?INDEX_UPD(TableName, IndexName, {Value, Type}, {AtomKey, Op})
+
+                            case IndexedColumns of
+                                % Single column index.
+                                [Column] ->
+                                    ?ATTRIBUTE(Column, Type, Value) = record_utils:get_column(Column, Record),
+                                    IndexValOp = crdt_utils:to_insert_op(Type, Value),
+                                    IndexValOps = case is_list(IndexValOp) of
+                                        true ->
+                                            lists:map(fun(IdxOp) -> {index_val, Type, IdxOp} end, IndexValOp);
+                                        false ->
+                                            [{index_val, Type, IndexValOp}]
+                                    end,
+                                    Op = lists:append([{bound_obj, ?FIELD_BOBJ_DT, BObjOp}], IndexValOps),
+                                    ?INDEX_UPD(TableName, IndexName, {Value, Type}, {AtomKey, Op});
+
+                                % Composite or multi-column index.
+                                _ ->
+                                    % Creates a tuple with the values of the indexed columns.
+                                    Value = list_to_tuple(lists:map(
+                                        fun(Column) ->
+                                            ?ATTRIBUTE(Column, _Type, Value) = record_utils:get_column(Column, Record),
+                                            Value
+                                        end,
+                                        IndexedColumns
+                                    )),
+                                    IValOp = crdt_utils:to_insert_op(?CRDT_VARCHAR, Value),
+                                    Op = [{bound_obj, ?FIELD_BOBJ_DT, BObjOp}, {index_val, ?CRDT_VARCHAR, IValOp}],
+
+                                    IndexKey = {Value, ?CRDT_VARCHAR},
+                                    IndexValue = {AtomKey, Op},
+                                    ?INDEX_UPD(TableName, IndexName, IndexKey, IndexValue)
+                            end
                     end
                 end, PIndexObject),
                 lists:append(Acc, lists:flatten(IdxUpds))
             end, [], Indexes)
     end.
 
-build_index_updates([Update | Updates], ObjBoundKey, Table, Acc) ->
-    {Key, _Type, _Bucket} = ObjBoundKey,
-    Indexes = table_utils:indexes(Table),
-    TName = table_utils:name(Table),
-    {{Col, CRDT}, {_CRDTOper, Val} = IndexValOp} = Update,
-    NewAcc =
-        case index_manager:lookup_index(Col, Indexes) of
-            {ok, []} ->
-                Acc;
-            {ok, Idxs} ->
-                AuxUpdates = lists:map(fun(Idx) ->
-                    BObjOp = crdt_utils:to_insert_op(?CRDT_VARCHAR, ObjBoundKey),
-                    EntryOp = [{bound_obj, ?FIELD_BOBJ_DT, BObjOp}, {index_val, CRDT, IndexValOp}],
+build_index_updates(Updates, BoundObjectKey, Table) ->
+    % Create pointer to row.
+    {Key, _Type, _Bucket} = BoundObjectKey,
+    BObjOp = crdt_utils:to_insert_op(?CRDT_VARCHAR, BoundObjectKey),
 
-                    ?INDEX_UPD(TName, index_manager:index_name(Idx), {Val, CRDT}, {Key, EntryOp})
-                end, Idxs),
-                lists:append(Acc, AuxUpdates)
+    % Iterate through each index and build the corresponding updates.
+    IndexUpdates = lists:map(
+        fun({IndexName, TableName, IndexedColumns}) ->
+            case IndexedColumns of
+                % Single column index.
+                [IndexedColumn] ->
+                    case find_update(IndexedColumn, Updates) of
+                        {ok, {{_, Type}, IValOp = {_, Value}}} ->
+                            Op = [{bound_obj, ?FIELD_BOBJ_DT, BObjOp}, {index_val, Type, IValOp}],
+                            ?INDEX_UPD(TableName, IndexName, {Value, Type}, {Key, Op});
+
+                        {error, not_found} ->
+                            ignore
+                    end;
+
+                % Composite or multi-column index.
+                _ ->
+                    ValueList = lists:filtermap(
+                        fun(Column) ->
+                            case find_update(Column, Updates) of
+                                {ok, {{_, _}, {_, Value}}} -> {true, Value};
+                                {error, not_found} -> false
+                            end
+                        end,
+                        IndexedColumns
+                    ),
+
+                    if
+                        length(ValueList) == length(IndexedColumns) ->
+                            Value = list_to_tuple(ValueList),
+                            IValOp = crdt_utils:to_insert_op(?CRDT_VARCHAR, Value),
+                            Op = [{bound_obj, ?FIELD_BOBJ_DT, BObjOp}, {index_val, ?CRDT_VARCHAR, IValOp}],
+
+                            IndexKey = {Value, ?CRDT_VARCHAR},
+                            IndexValue = {Key, Op},
+                            ?INDEX_UPD(TableName, IndexName, IndexKey, IndexValue);
+
+                        true ->
+                            ignore
+                    end
+            end
         end,
-    build_index_updates(Updates, ObjBoundKey, Table, NewAcc);
-build_index_updates([], _ObjBoundKey, _Table, Acc) ->
-    Acc.
+        table_utils:indexes(Table)
+    ),
+    lists:filter(
+        fun(ignore) -> false;
+           (_) -> true
+        end,
+        IndexUpdates
+    ).
+
+find_update(_, []) ->
+    {error, not_found};
+find_update(Column, [Update = {{Column, _}, {_, _}} | _Rest]) ->
+    {ok, Update};
+find_update(Column, [_Update | Rest]) ->
+    find_update(Column, Rest).
 
 %% Given a list of index updates, build the database updates given
 %% that it may be necessary to delete old entries and
