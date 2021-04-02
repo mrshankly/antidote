@@ -74,7 +74,6 @@ init(_Args) ->
 
     QueryOptimizer = ?CHILD(query_optimizer, worker, []),
     IndexManager = ?CHILD(index_manager, worker, []),
-    QueryingUtilsCoordSup = ?CHILD(querying_utils, worker, []),
     BCounterManager = ?CHILD(bcounter_mgr, worker, []),
 
     StableMetaData = ?CHILD(stable_meta_data_server, worker, []),
@@ -117,7 +116,6 @@ init(_Args) ->
        BCounterManager,
        QueryOptimizer,
        IndexManager,
-       QueryingUtilsCoordSup,
 %       LogResponseReaderSup,
        PbSup,
        AntidoteStats

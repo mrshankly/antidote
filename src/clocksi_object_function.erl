@@ -33,8 +33,7 @@
 -export([sync_execute_object_function/6]).
 
 sync_execute_object_function(Transaction, IndexNode, Key, Type, ReadFun, WriteSet) ->
-    Args = {IndexNode, Transaction, WriteSet, Key, Type},
-    Result = case gen_statem:call(querying_utils, {read_async, Args}) of %clocksi_vnode:read_data_item(IndexNode, Transaction, Key, Type, WriteSet) of
+    Result = case clocksi_vnode:read_data_item(IndexNode, Transaction, Key, Type, WriteSet) of
         {ok, S} ->
             S;
         {error, Reason1} ->
